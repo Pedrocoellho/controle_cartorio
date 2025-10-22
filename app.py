@@ -144,7 +144,7 @@ with left:
         else:
             add_ato(nome_ato.strip(), float(valor), data_ocorrido.isoformat(), descricao.strip())
             st.success("Registro salvo com sucesso!")
-            st.experimental_rerun()
+            st.rerun()
 
     st.markdown("---")
     st.subheader("📋 Registros")
@@ -177,7 +177,7 @@ with left:
                     if selected_id in df['id'].values:
                         delete_ato(int(selected_id))
                         st.success(f"Registro {selected_id} deletado.")
-                        st.experimental_rerun()
+                        st.rerun()
                     else:
                         st.error("ID não encontrado nos registros mostrados.")
 
