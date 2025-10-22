@@ -4,7 +4,7 @@ import sqlite3
 from datetime import datetime
 import io
 
-DB_PATH = "cartorio.db"
+DB_PATH = "teste.db"
 
 # --------------------- Database helpers ---------------------
 
