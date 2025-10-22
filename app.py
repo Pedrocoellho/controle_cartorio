@@ -121,7 +121,7 @@ with st.sidebar:
     search = st.text_input("Pesquisar por nome do ato")
     st.write("")
     if st.button("Aplicar filtros"):
-        st.experimental_rerun()
+        st.rerun()
     st.markdown("---")
     st.header("Exportação")
     st.write("Exportar todos os registros filtrados")
