@@ -17,38 +17,23 @@ def get_connection():
 def init_db():
     conn = get_connection()
     c = conn.cursor()
-
     # Cria a tabela se não existir
     c.execute("""
         CREATE TABLE IF NOT EXISTS atos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nome_ato TEXT NOT NULL,
-            valor REAL,
+            valor REAL NOT NULL,
             data_ocorrido TEXT,
             descricao TEXT,
             criado_em TEXT NOT NULL
         )
     """)
-
-    # Verifica colunas existentes
+    # Verifica e adiciona colunas ausentes (corrige bancos antigos)
     existing_cols = [row["name"] for row in c.execute("PRAGMA table_info(atos)").fetchall()]
-
-    # Garante que todas as colunas existam (mesmo se o banco for antigo)
-    if "valor" not in existing_cols:
-        c.execute("ALTER TABLE atos ADD COLUMN valor REAL")
-
     if "data_ocorrido" not in existing_cols:
         c.execute("ALTER TABLE atos ADD COLUMN data_ocorrido TEXT")
-
-    if "descricao" not in existing_cols:
-        c.execute("ALTER TABLE atos ADD COLUMN descricao TEXT")
-
-    if "criado_em" not in existing_cols:
-        c.execute("ALTER TABLE atos ADD COLUMN criado_em TEXT")
-
     conn.commit()
     conn.close()
-
 
 
 def add_ato(nome_ato: str, valor: float, data_ocorrido: str, descricao: str = ""):
