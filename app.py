@@ -3,6 +3,7 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 import io
+import os
 
 DB_PATH = "teste2.db"
 
@@ -28,10 +29,16 @@ def init_db():
             criado_em TEXT NOT NULL
         )
     """)
-    # Verifica e adiciona colunas ausentes (corrige bancos antigos)
+
+    # Garante que todas as colunas existam
     existing_cols = [row["name"] for row in c.execute("PRAGMA table_info(atos)").fetchall()]
-    if "data_ocorrido" not in existing_cols:
-        c.execute("ALTER TABLE atos ADD COLUMN data_ocorrido TEXT")
+    required_cols = ["nome_ato", "valor", "data_ocorrido", "descricao", "criado_em"]
+    for col in required_cols:
+        if col not in existing_cols:
+            tipo = "REAL" if col == "valor" else "TEXT"
+            c.execute(f"ALTER TABLE atos ADD COLUMN {col} {tipo}")
+            print(f"✅ Coluna adicionada: {col}")
+
     conn.commit()
     conn.close()
 
@@ -71,9 +78,9 @@ def get_atos(start_date=None, end_date=None, search=None):
     df = pd.DataFrame(rows)
     if not df.empty:
         if "data_ocorrido" in df.columns:
-            df['data_ocorrido'] = pd.to_datetime(df['data_ocorrido'], errors='coerce').dt.date
+            df["data_ocorrido"] = pd.to_datetime(df["data_ocorrido"], errors="coerce").dt.strftime("%d/%m/%Y")
         if "criado_em" in df.columns:
-            df['criado_em'] = pd.to_datetime(df['criado_em'], errors='coerce')
+            df["criado_em"] = pd.to_datetime(df["criado_em"], errors="coerce").dt.strftime("%d/%m/%Y %H:%M")
     return df
 
 
@@ -108,7 +115,6 @@ def format_currency(v):
 st.set_page_config(page_title="Controle de Atos - Cartório", layout="wide")
 init_db()
 
-# Header
 col1, col2 = st.columns([3, 1])
 with col1:
     st.title("📁 Controle de Atos - Cartório")
@@ -168,42 +174,46 @@ with left:
     if df.empty:
         st.info("Nenhum registro encontrado com os filtros selecionados.")
     else:
-        total_valor = df["valor"].sum()
-        count = len(df)
-        st.metric("Total de registros", count)
-        st.metric("Valor total (R$)", format_currency(total_valor))
+        st.write("🔎 **Colunas do DataFrame:**", list(df.columns))
+        if "valor" not in df.columns:
+            st.error("A coluna 'valor' não foi encontrada no banco. Pode ser necessário recriar o banco.")
+        else:
+            total_valor = df["valor"].sum()
+            count = len(df)
+            st.metric("Total de registros", count)
+            st.metric("Valor total (R$)", format_currency(total_valor))
 
-        view_df = df.copy()
-        view_df["valor"] = view_df["valor"].apply(lambda x: f"R$ {x:,.2f}")
-        st.dataframe(view_df[["id", "nome_ato", "valor", "data_ocorrido", "descricao", "criado_em"]])
+            view_df = df.copy()
+            view_df["valor"] = view_df["valor"].apply(lambda x: f"R$ {x:,.2f}")
+            st.dataframe(view_df[["id", "nome_ato", "valor", "data_ocorrido", "descricao", "criado_em"]])
 
-        st.write("")
-        cols = st.columns([3, 1])
-        with cols[0]:
-            selected_id = st.number_input("ID do registro para deletar", min_value=0, value=0, step=1)
-        with cols[1]:
-            if st.button("🗑️ Deletar registro"):
-                if selected_id == 0:
-                    st.warning("Informe um **ID válido**.")
-                elif selected_id in df["id"].values:
-                    delete_ato(int(selected_id))
-                    st.success(f"Registro {selected_id} deletado.")
-                    st.rerun()
-                else:
-                    st.error("ID não encontrado nos registros atuais.")
+            st.write("")
+            cols = st.columns([3, 1])
+            with cols[0]:
+                selected_id = st.number_input("ID do registro para deletar", min_value=0, value=0, step=1)
+            with cols[1]:
+                if st.button("🗑️ Deletar registro"):
+                    if selected_id == 0:
+                        st.warning("Informe um **ID válido**.")
+                    elif selected_id in df["id"].values:
+                        delete_ato(int(selected_id))
+                        st.success(f"Registro {selected_id} deletado.")
+                        st.rerun()
+                    else:
+                        st.error("ID não encontrado nos registros atuais.")
 
-        csv = df.to_csv(index=False).encode("utf-8")
-        excel_bytes = to_excel_bytes(df)
-        st.download_button("⬇️ Baixar CSV", data=csv, file_name="atos_cartorio.csv", mime="text/csv")
-        st.download_button("⬇️ Baixar XLSX", data=excel_bytes,
-                           file_name="atos_cartorio.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+            csv = df.to_csv(index=False).encode("utf-8")
+            excel_bytes = to_excel_bytes(df)
+            st.download_button("⬇️ Baixar CSV", data=csv, file_name="atos_cartorio.csv", mime="text/csv")
+            st.download_button("⬇️ Baixar XLSX", data=excel_bytes,
+                            file_name="atos_cartorio.xlsx",
+                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 # --------------------- Visão rápida ---------------------
 with right:
     st.subheader("📊 Visão rápida")
     summary = get_atos()
-    if not summary.empty:
+    if not summary.empty and "valor" in summary.columns:
         df_month = summary.copy()
         df_month["mes"] = pd.to_datetime(df_month["data_ocorrido"], errors="coerce").dt.to_period("M")
         pivot = df_month.groupby("mes")["valor"].agg(["count", "sum"]).reset_index()
