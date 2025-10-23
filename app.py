@@ -5,7 +5,7 @@ from datetime import datetime
 import io
 import os
 
-DB_PATH = "teste2.db"
+DB_PATH = "controle_cartorio.db"
 
 # --------------------- Database helpers ---------------------
 
