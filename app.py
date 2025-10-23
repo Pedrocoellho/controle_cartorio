@@ -68,6 +68,7 @@ def get_atos(start_date=None, end_date=None, search=None):
     df = pd.read_sql_query("SELECT * FROM atos", conn)
     conn.close()
 
+    # Se a coluna existir, formata datas corretamente
     if "data_ocorrido" in df.columns:
         df["data_ocorrido"] = pd.to_datetime(df["data_ocorrido"], errors='coerce')
 
@@ -132,6 +133,7 @@ with st.form("form_ato"):
         if nome_ato and valor > 0:
             add_ato(nome_ato, valor, data_ocorrido.strftime("%Y-%m-%d"), descricao)
             st.success("✅ Registro salvo com sucesso!")
+            st.experimental_rerun()
         else:
             st.warning("⚠️ Preencha todos os campos obrigatórios.")
 
@@ -147,17 +149,19 @@ df = get_atos(
 )
 
 if not df.empty:
-    # Exibe tabela com botão de exclusão
-    for index, row in df.iterrows():
-        with st.expander(f"📄 {row['nome_ato']} — R$ {row['valor']:.2f}"):
-            st.write(f"**Data do ocorrido:** {row['data_ocorrido']}")
-            st.write(f"**Descrição:** {row['descricao'] if row['descricao'] else '-'}")
-            st.write(f"**Criado em:** {row['criado_em']}")
+    # Adiciona botão de exclusão
+    for i, row in df.iterrows():
+        delete_col = st.button("🗑️", key=f"delete_{row['id']}")
+        if delete_col:
+            delete_ato(row['id'])
+            st.warning(f"Registro '{row['nome_ato']}' excluído com sucesso!")
+            st.experimental_rerun()
 
-            if st.button(f"🗑️ Excluir registro #{row['id']}", key=f"delete_{row['id']}"):
-                delete_ato(row['id'])
-                st.warning(f"Registro '{row['nome_ato']}' excluído com sucesso!")
-                st.experimental_rerun()
+    # Exibe a tabela
+    st.dataframe(
+        df[["id", "nome_ato", "valor", "data_ocorrido", "descricao", "criado_em"]],
+        use_container_width=True
+    )
 
     # Exportação
     csv = df.to_csv(index=False).encode('utf-8')
