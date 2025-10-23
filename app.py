@@ -54,6 +54,14 @@ def add_ato(nome_ato, valor, data_ocorrido, descricao):
     conn.commit()
     conn.close()
 
+def delete_ato(ato_id):
+    """Remove um registro do banco pelo ID."""
+    conn = sqlite3.connect(DB_PATH)
+    c = conn.cursor()
+    c.execute("DELETE FROM atos WHERE id = ?", (ato_id,))
+    conn.commit()
+    conn.close()
+
 def get_atos(start_date=None, end_date=None, search=None):
     """Retorna registros com base em filtros."""
     conn = sqlite3.connect(DB_PATH)
@@ -69,6 +77,12 @@ def get_atos(start_date=None, end_date=None, search=None):
         df = df[df["data_ocorrido"] <= pd.to_datetime(end_date)]
     if search:
         df = df[df["nome_ato"].str.contains(search, case=False, na=False)]
+
+    # Converte datas para formato brasileiro
+    if "data_ocorrido" in df.columns:
+        df["data_ocorrido"] = df["data_ocorrido"].dt.strftime("%d/%m/%Y")
+    if "criado_em" in df.columns:
+        df["criado_em"] = pd.to_datetime(df["criado_em"], errors="coerce").dt.strftime("%d/%m/%Y %H:%M")
 
     return df
 
@@ -133,7 +147,17 @@ df = get_atos(
 )
 
 if not df.empty:
-    st.dataframe(df, use_container_width=True)
+    # Exibe tabela com botão de exclusão
+    for index, row in df.iterrows():
+        with st.expander(f"📄 {row['nome_ato']} — R$ {row['valor']:.2f}"):
+            st.write(f"**Data do ocorrido:** {row['data_ocorrido']}")
+            st.write(f"**Descrição:** {row['descricao'] if row['descricao'] else '-'}")
+            st.write(f"**Criado em:** {row['criado_em']}")
+
+            if st.button(f"🗑️ Excluir registro #{row['id']}", key=f"delete_{row['id']}"):
+                delete_ato(row['id'])
+                st.warning(f"Registro '{row['nome_ato']}' excluído com sucesso!")
+                st.experimental_rerun()
 
     # Exportação
     csv = df.to_csv(index=False).encode('utf-8')
