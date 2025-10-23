@@ -3,13 +3,11 @@ import pandas as pd
 import sqlite3
 from datetime import datetime
 
-# Caminho do banco de dados
 DB_PATH = "atos_cartorio.db"
 
 # --------------------- FUNÇÕES DE BANCO ---------------------
 
 def init_db():
-    """Inicializa o banco de dados se ele não existir."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -26,13 +24,11 @@ def init_db():
     conn.close()
 
 def ensure_columns():
-    """Garante que todas as colunas necessárias existam na tabela."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("PRAGMA table_info(atos)")
     cols = [row[1] for row in c.fetchall()]
 
-    # Adiciona colunas que estiverem faltando
     if "data_ocorrido" not in cols:
         c.execute("ALTER TABLE atos ADD COLUMN data_ocorrido TEXT")
     if "descricao" not in cols:
@@ -44,7 +40,6 @@ def ensure_columns():
     conn.close()
 
 def add_ato(nome_ato, valor, data_ocorrido, descricao):
-    """Insere um novo registro na tabela."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
@@ -55,7 +50,6 @@ def add_ato(nome_ato, valor, data_ocorrido, descricao):
     conn.close()
 
 def delete_ato(ato_id):
-    """Remove um registro do banco pelo ID."""
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("DELETE FROM atos WHERE id = ?", (ato_id,))
@@ -63,12 +57,10 @@ def delete_ato(ato_id):
     conn.close()
 
 def get_atos(start_date=None, end_date=None, search=None):
-    """Retorna registros com base em filtros."""
     conn = sqlite3.connect(DB_PATH)
     df = pd.read_sql_query("SELECT * FROM atos", conn)
     conn.close()
 
-    # Se a coluna existir, formata datas corretamente
     if "data_ocorrido" in df.columns:
         df["data_ocorrido"] = pd.to_datetime(df["data_ocorrido"], errors='coerce')
 
@@ -79,7 +71,7 @@ def get_atos(start_date=None, end_date=None, search=None):
     if search:
         df = df[df["nome_ato"].str.contains(search, case=False, na=False)]
 
-    # Converte datas para formato brasileiro
+    # Formatar datas no padrão brasileiro
     if "data_ocorrido" in df.columns:
         df["data_ocorrido"] = df["data_ocorrido"].dt.strftime("%d/%m/%Y")
     if "criado_em" in df.columns:
@@ -89,15 +81,10 @@ def get_atos(start_date=None, end_date=None, search=None):
 
 # --------------------- CONFIGURAÇÃO DO APP ---------------------
 
-st.set_page_config(
-    page_title="Controle de Atos de Cartório",
-    page_icon="📜",
-    layout="wide"
-)
+st.set_page_config(page_title="Controle de Atos de Cartório", page_icon="📜", layout="wide")
 
 st.title("📜 Controle de Atos de Cartório")
 
-# Inicializa e corrige o banco
 init_db()
 ensure_columns()
 
@@ -149,22 +136,25 @@ df = get_atos(
 )
 
 if not df.empty:
-    # Adiciona botão de exclusão
+    # Adiciona uma coluna de botões de exclusão
+    df["Excluir"] = ""
     for i, row in df.iterrows():
-        delete_col = st.button("🗑️", key=f"delete_{row['id']}")
-        if delete_col:
-            delete_ato(row['id'])
-            st.warning(f"Registro '{row['nome_ato']}' excluído com sucesso!")
-            st.experimental_rerun()
+        col1, col2 = st.columns([9, 1])
+        with col1:
+            st.write("")
+        with col2:
+            if st.button("🗑️", key=f"delete_{row['id']}"):
+                delete_ato(row["id"])
+                st.warning(f"Registro '{row['nome_ato']}' excluído com sucesso!")
+                st.experimental_rerun()
 
-    # Exibe a tabela
+    # Exibe a tabela com a coluna de ações
     st.dataframe(
         df[["id", "nome_ato", "valor", "data_ocorrido", "descricao", "criado_em"]],
         use_container_width=True
     )
 
-    # Exportação
-    csv = df.to_csv(index=False).encode('utf-8')
+    csv = df.to_csv(index=False).encode("utf-8")
     st.download_button("📥 Baixar registros (CSV)", csv, "registros_cartorio.csv", "text/csv")
 
 else:
